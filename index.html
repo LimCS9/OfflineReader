@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Comic Reader">
-  <title>CBZ Reader</title>
+  <meta name="apple-mobile-web-app-title" content="Offline Reader">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Offline Reader</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,12 +22,12 @@
       --muted:  #888;
     }
 
-    /* Strict fullscreen to draw completely under notches and home indicators */
+    /* Strict fullscreen using 100vh to draw completely under notches and home indicators */
     html, body {
       position: fixed;
-      inset: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
       width: 100vw;
-      height: 100dvh;
+      height: 100vh;
       background-color: #000000 !important;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -49,11 +51,11 @@
     .app-icon {
       width: 84px; height: 84px;
       border-radius: 20px;
-      background: var(--accent);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2.5rem;
+      overflow: hidden;
       box-shadow: 0 8px 24px rgba(0,0,0,.5);
+      background: var(--bg);
     }
+    .app-icon img { width: 100%; height: 100%; display: block; object-fit: cover; }
 
     h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: -.5px; }
     .subtitle { color: var(--muted); font-size: .88rem; line-height: 1.6; max-width: 280px; }
@@ -143,9 +145,7 @@
     /* ── Scrolling Area ── */
     #reader-pages {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0; right: 0; bottom: 0;
       overflow-y: scroll;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
@@ -158,6 +158,8 @@
 
     .page-wrapper {
       width: 100%;
+      max-width: 800px; /* iPad / Desktop constraints */
+      margin: 0 auto;   /* Center on large screens */
       background: #000;
       display: block; 
       position: relative;
@@ -183,6 +185,9 @@
       border-bottom: 1px solid #1a1a1a;
       text-transform: uppercase;
       letter-spacing: 1px;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
     }
 
     /* Hides elements robustly without layout shifting bugs */
@@ -239,15 +244,15 @@
 <body>
 
   <div id="upload-screen">
-    <div class="app-icon">📖</div>
-    <h1>CBZ Reader</h1>
+    <div class="app-icon"><img src="icon.svg" alt=""></div>
+    <h1>Offline Reader</h1>
     <p class="subtitle">Read your archives offline.<br>Private and fast extraction.</p>
     <div id="drop-zone" onclick="document.getElementById('file-input').click()">
       <span class="drop-icon">📂</span>
       <p style="font-weight:700">Drop files here</p>
       <p style="font-size: .8rem; color: var(--muted); margin-top: .4rem;">or tap to browse</p>
     </div>
-    <button class="open-btn" onclick="document.getElementById('file-input').click()">Open Comic</button>
+    <button class="open-btn" onclick="document.getElementById('file-input').click()">Open Archive</button>
     <p class="hint">Supports .cbz and .zip</p>
     <input type="file" id="file-input" accept=".cbz,.zip" multiple>
   </div>
