@@ -166,17 +166,18 @@
       background: #000;
       display: block; 
       position: relative;
+      aspect-ratio: 2 / 3; /* Prevents layout collapse before load */
     }
 
     .comic-page {
       display: block;
       width: 100%;
-      height: auto;
+      height: 100%; /* Spans the entire wrapper seamlessly */
+      object-fit: contain; /* Ensures no distortion */
       margin: 0;
       padding: 0;
     }
     .comic-page.placeholder {
-      aspect-ratio: 2/3;
       background: #080808;
     }
 
@@ -238,9 +239,9 @@
       border-radius: 100px;
       padding: .5rem 1rem;
       box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      transition: all 0.3s ease;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
     }
-    #autoscroll-bar.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
+    #autoscroll-bar.ui-hidden { opacity: 0; transform: translateX(-50%) translateY(100px); pointer-events: none; }
 
     .as-btn {
       background: none; border: none; color: #fff;
@@ -284,9 +285,6 @@
       <span id="comic-title">Comic</span>
       
       <button id="mode-toggle" class="hidden">Scroll</button>
-      <button class="icon-btn" id="autoscroll-toggle">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
-      </button>
     </header>
 
     <div id="reader-pages"></div>
@@ -300,9 +298,11 @@
       </div>
     </footer>
 
-    <div id="autoscroll-bar" class="hidden">
+    <div id="autoscroll-bar" class="ui-hidden">
       <button class="as-btn" id="as-slower">−</button>
-      <button class="as-btn" id="as-playpause">▶</button>
+      <button class="as-btn" id="as-playpause">
+        <svg style="transform: translateX(1px)" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+      </button>
       <span id="as-speed-label">0</span>
       <button class="as-btn" id="as-faster">+</button>
     </div>
@@ -316,7 +316,7 @@
     }
 
     // --- State ---
-    let pages = []; // {entry, url, loading, height}
+    let pages = []; // {entry, url, loading, aspectLocked}
     let chapters = [];
     let blobUrls = [];
     let currentPage = 0;
@@ -324,6 +324,7 @@
     let chapterMode = false;
     let autoRunning = false;
     let speedIdx = 3;
+    let uiHidden = false;
     const SPEED_LEVELS = [0.3, 0.6, 1.0, 1.6, 2.5, 4.0, 6.0, 9.0];
     const MEMORY_WINDOW = 12;
     const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
@@ -387,7 +388,7 @@
         const groups = await extractEntries(zip, files[0].name.replace(ARCHIVE_EXT, ''));
         groups.forEach(g => {
           const start = pages.length;
-          g.images.forEach(entry => pages.push({ entry, url: null, loading: false, height: null }));
+          g.images.forEach(entry => pages.push({ entry, url: null, loading: false, aspectLocked: false }));
           chapters.push({ name: g.name, start, end: pages.length - 1 });
         });
       } else {
@@ -397,7 +398,7 @@
           const imgs = Object.values(zip.files).filter(f => !f.dir && IMAGE_EXT.test(f.name)).sort((a,b) => naturalSort(a.name, b.name));
           if (imgs.length) {
             const start = pages.length;
-            imgs.forEach(entry => pages.push({ entry, url: null, loading: false, height: null }));
+            imgs.forEach(entry => pages.push({ entry, url: null, loading: false, aspectLocked: false }));
             chapters.push({ name: f.name.replace(ARCHIVE_EXT,''), start, end: pages.length - 1 });
           }
         }
@@ -406,6 +407,9 @@
       comicTitle.textContent = chapters[0].name;
       renderPages();
       showScreen('reader-screen');
+      uiHidden = false;
+      updateUI();
+      resetIdle();
       setupUI();
       setupObservers();
     });
@@ -448,9 +452,15 @@
         p.el.src = p.url;
         p.el.onload = () => {
           p.el.classList.remove('placeholder');
-          if (!p.height) {
-            p.height = p.el.getBoundingClientRect().height;
-            p.wrap.style.height = p.height + 'px';
+          // Lock height using native aspect-ratio. 
+          // This allows flawless height recalcuations natively when the phone rotates.
+          if (!p.aspectLocked) {
+            const nw = p.el.naturalWidth;
+            const nh = p.el.naturalHeight;
+            if (nw && nh) {
+              p.wrap.style.aspectRatio = `${nw} / ${nh}`;
+              p.aspectLocked = true;
+            }
           }
         };
       } catch(e) { p.loading = false; }
@@ -545,16 +555,25 @@
       document.querySelectorAll('.ch-hidden').forEach(el => el.classList.remove('ch-hidden'));
     }
 
+    function updateUI() {
+      readerHeader.classList.toggle('ui-hidden', uiHidden);
+      readerFooter.classList.toggle('ui-hidden', uiHidden);
+      autoscrollBar.classList.toggle('ui-hidden', uiHidden);
+    }
+
     // --- Smooth Auto Scroll via Window Scroll ---
     let lastTime = 0;
     let idleTimer = null;
+    const playIcon = `<svg style="transform: translateX(1px)" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>`;
+    const pauseIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
 
     function resetIdle() {
       clearTimeout(idleTimer);
-      if (!autoscrollBar.classList.contains('hidden')) {
+      if (!uiHidden) {
         idleTimer = setTimeout(() => {
-          autoscrollBar.classList.add('hidden');
-        }, 3000); // Auto-hides after 3 seconds of no interaction
+          uiHidden = true;
+          updateUI();
+        }, 2000); // Auto-hides after 2 seconds of no interaction
       }
     }
 
@@ -574,30 +593,25 @@
 
     function startAutoScroll() {
       autoRunning = true; lastTime = 0;
-      document.getElementById('as-playpause').textContent = '⏸';
+      document.getElementById('as-playpause').innerHTML = pauseIcon;
       
       // Hide standard UI elements when starting
       uiHidden = true;
-      readerHeader.classList.add('ui-hidden');
-      readerFooter.classList.add('ui-hidden');
+      updateUI();
       
-      resetIdle(); 
       requestAnimationFrame(autoStep);
     }
     function stopAutoScroll() { 
       autoRunning = false; 
-      document.getElementById('as-playpause').textContent = '▶'; 
+      document.getElementById('as-playpause').innerHTML = playIcon; 
       resetIdle(); 
     }
 
-    autoscrollBar.addEventListener('touchstart', resetIdle, {passive: true});
-    autoscrollBar.addEventListener('click', resetIdle);
-
-    document.getElementById('autoscroll-toggle').addEventListener('click', (e) => { 
-      e.stopPropagation(); 
-      autoscrollBar.classList.toggle('hidden'); 
-      resetIdle();
+    [readerHeader, readerFooter, autoscrollBar].forEach(el => {
+      el.addEventListener('touchstart', resetIdle, {passive: true});
+      el.addEventListener('click', resetIdle);
     });
+
     document.getElementById('as-playpause').addEventListener('click', () => autoRunning ? stopAutoScroll() : startAutoScroll());
     
     document.getElementById('as-faster').addEventListener('click', () => { 
@@ -616,16 +630,21 @@
       document.getElementById('as-speed-label').textContent = diff > 0 ? '+' + diff : diff.toString(); 
     }
 
-    let uiHidden = false;
     readerPages.addEventListener('click', () => {
       if (autoRunning) { 
         stopAutoScroll(); 
-        autoscrollBar.classList.remove('hidden'); 
+        uiHidden = false;
+        updateUI();
         resetIdle();
+        return;
       }
       uiHidden = !uiHidden;
-      readerHeader.classList.toggle('ui-hidden', uiHidden);
-      readerFooter.classList.toggle('ui-hidden', uiHidden);
+      updateUI();
+      if (!uiHidden) {
+        resetIdle();
+      } else {
+        clearTimeout(idleTimer);
+      }
     });
 
     document.getElementById('close-btn').addEventListener('click', () => { location.reload(); });
