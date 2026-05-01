@@ -216,9 +216,18 @@
     #chapter-label { font-size: .75rem; color: var(--muted); padding: 0 .2rem; }
     
     #mode-toggle {
-      font-size: .7rem; font-weight: 700;
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: 6px; padding: .2rem .5rem; color: var(--muted);
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: var(--surf); 
+      border: 1px solid var(--border);
+      border-radius: 6px; 
+      padding: 0; 
+      color: var(--muted);
+      width: 64px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #page-indicator { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -284,7 +293,10 @@
       </button>
       <span id="comic-title">Comic</span>
       
-      <button id="mode-toggle" class="hidden">Scroll</button>
+      <button id="mode-toggle" class="hidden">∞</button>
+      <button class="icon-btn" id="autoscroll-toggle">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+      </button>
     </header>
 
     <div id="reader-pages"></div>
@@ -325,6 +337,7 @@
     let autoRunning = false;
     let speedIdx = 3;
     let uiHidden = false;
+    let autoscrollEnabled = false; // State to track if autoscroll UI is toggled on explicitly
     const SPEED_LEVELS = [0.3, 0.6, 1.0, 1.6, 2.5, 4.0, 6.0, 9.0];
     const MEMORY_WINDOW = 12;
     const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
@@ -529,7 +542,15 @@
     // --- Mode Toggle ---
     modeToggle.addEventListener('click', () => {
       chapterMode = !chapterMode;
-      modeToggle.textContent = chapterMode ? 'Chapter' : 'Scroll';
+      
+      if (chapterMode) {
+        modeToggle.textContent = 'Chapter';
+        modeToggle.style.fontSize = '0.75rem';
+      } else {
+        modeToggle.textContent = '∞';
+        modeToggle.style.fontSize = '1.2rem';
+      }
+
       if (chapterMode) {
         currentChIdx = chapters.findIndex(ch => currentPage >= ch.start && currentPage <= ch.end);
         if (currentChIdx === -1) currentChIdx = 0;
@@ -558,8 +579,16 @@
     function updateUI() {
       readerHeader.classList.toggle('ui-hidden', uiHidden);
       readerFooter.classList.toggle('ui-hidden', uiHidden);
-      autoscrollBar.classList.toggle('ui-hidden', uiHidden);
+      autoscrollBar.classList.toggle('ui-hidden', uiHidden || !autoscrollEnabled);
     }
+
+    // Auto-scroll explicit toggle
+    document.getElementById('autoscroll-toggle').addEventListener('click', (e) => { 
+      e.stopPropagation(); 
+      autoscrollEnabled = !autoscrollEnabled;
+      updateUI();
+      resetIdle();
+    });
 
     // --- Smooth Auto Scroll via Window Scroll ---
     let lastTime = 0;
