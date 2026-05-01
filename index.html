@@ -22,17 +22,13 @@
       --muted:  #888;
     }
 
-    /* Strict fullscreen using 100vh to draw completely under notches and home indicators */
+    /* Native scrolling allows Safari to collapse its top and bottom bars automatically */
     html, body {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: #000000 !important;
+      background-color: #000000;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       overscroll-behavior: none;
-      overflow: hidden;
+      min-height: 100dvh;
     }
 
     /* ── Upload Screen ── */
@@ -41,7 +37,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
+      min-height: 100dvh;
       padding: 2rem 1.5rem;
       gap: 1.5rem;
       text-align: center;
@@ -97,8 +93,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
+      min-height: 100dvh;
       gap: 1.2rem;
+      background: #000;
     }
     .spinner {
       width: 44px; height: 44px;
@@ -113,15 +110,13 @@
     /* ── Reader Screen ── */
     #reader-screen {
       display: none;
-      position: relative;
-      height: 100%;
       width: 100%;
       background: #000;
-      overflow: hidden;
     }
 
+    /* Fixed to the window so it stays at top even when body scrolls */
     #reader-header {
-      position: absolute;
+      position: fixed;
       top: 0; left: 0; right: 0;
       z-index: 100;
       display: flex;
@@ -144,17 +139,9 @@
 
     /* ── Scrolling Area ── */
     #reader-pages {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      overflow-y: scroll;
-      overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
-      display: block;
+      width: 100%;
       background: #000;
-      scrollbar-width: none;
-      will-change: scroll-position;
     }
-    #reader-pages::-webkit-scrollbar { display: none; }
 
     .page-wrapper {
       width: 100%;
@@ -363,6 +350,7 @@
       showScreen('loading-screen');
       pages = []; chapters = []; blobUrls.forEach(URL.revokeObjectURL); blobUrls = [];
       readerPages.innerHTML = '';
+      window.scrollTo(0, 0); // Reset scroll to top
 
       if (files.length === 1) {
         const zip = await JSZip.loadAsync(await files[0].arrayBuffer());
@@ -430,7 +418,6 @@
         p.el.src = p.url;
         p.el.onload = () => {
           p.el.classList.remove('placeholder');
-          // Lock height using bounding rect to prevent jagged scrolling
           if (!p.height) {
             p.height = p.el.getBoundingClientRect().height;
             p.wrap.style.height = p.height + 'px';
@@ -449,7 +436,7 @@
       });
     }
 
-    // --- Reliable Intersection Observer ---
+    // --- Reliable Intersection Observer using viewport ---
     let visiblePages = new Set();
     function setupObservers() {
       const observer = new IntersectionObserver(entries => {
@@ -463,7 +450,6 @@
           }
         });
 
-        // Ensure current page is the topmost visible image on screen
         if (visiblePages.size > 0) {
           const minVisible = Math.min(...Array.from(visiblePages));
           if (minVisible !== currentPage) {
@@ -472,7 +458,7 @@
             unloadDistant();
           }
         }
-      }, { root: readerPages, threshold: 0.05 }); // Triggers almost instantly
+      }, { threshold: 0.05 }); 
       document.querySelectorAll('.page-wrapper').forEach(w => observer.observe(w));
     }
 
@@ -485,11 +471,9 @@
     }
 
     function updateIndicator() {
-      // Accurately determine the active chapter based on the visible page
       const chIdx = chapters.findIndex(ch => currentPage >= ch.start && currentPage <= ch.end);
       if (chIdx !== -1) currentChIdx = chIdx;
 
-      // Update Top Right Indicator
       if (chapterMode) {
         const ch = chapters[currentChIdx];
         pageIndicator.textContent = `${currentPage - ch.start + 1} / ${ch.end - ch.start + 1}`;
@@ -497,7 +481,6 @@
         pageIndicator.textContent = `${currentPage + 1} / ${pages.length}`;
       }
 
-      // Update Center Chapter Label
       if (chapters.length > 1) {
         document.getElementById('chapter-label').textContent = `${currentChIdx + 1}/${chapters.length}`;
       }
@@ -511,7 +494,7 @@
         currentChIdx = chapters.findIndex(ch => currentPage >= ch.start && currentPage <= ch.end);
         if (currentChIdx === -1) currentChIdx = 0;
         applyChapterMode();
-        readerPages.scrollTop = 0;
+        window.scrollTo(0, 0);
         for (let i = chapters[currentChIdx].start; i <= Math.min(chapters[currentChIdx].start + 3, chapters[currentChIdx].end); i++) loadPage(i);
       } else {
         applyScrollMode();
@@ -525,7 +508,6 @@
       document.querySelectorAll('.page-wrapper').forEach(el => {
         el.classList.toggle('ch-hidden', parseInt(el.dataset.chapter) !== currentChIdx);
       });
-      // The CSS .ch-hidden class now has !important to ensure dividers are completely removed
       document.querySelectorAll('.chapter-divider').forEach(el => el.classList.add('ch-hidden'));
     }
 
@@ -533,7 +515,7 @@
       document.querySelectorAll('.ch-hidden').forEach(el => el.classList.remove('ch-hidden'));
     }
 
-    // --- Smooth Auto Scroll ---
+    // --- Smooth Auto Scroll via Window Scroll ---
     let lastTime = 0;
     function autoStep(timestamp) {
       if (!autoRunning) return;
@@ -541,8 +523,11 @@
       const dt = timestamp - lastTime;
       lastTime = timestamp;
       const speed = SPEED_LEVELS[speedIdx] / 16.6; 
-      readerPages.scrollTop += speed * dt;
-      if (readerPages.scrollTop + readerPages.clientHeight >= readerPages.scrollHeight - 2) stopAutoScroll();
+      
+      // Native window scroll
+      window.scrollBy(0, speed * dt);
+      
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) stopAutoScroll();
       else requestAnimationFrame(autoStep);
     }
 
@@ -577,7 +562,7 @@
         if (chapterMode) {
           currentPage = chapters[currentChIdx].start;
           applyChapterMode();
-          readerPages.scrollTop = 0;
+          window.scrollTo(0, 0);
           updateIndicator();
           for (let i = currentPage; i <= Math.min(currentPage + 3, chapters[currentChIdx].end); i++) loadPage(i);
         } else {
@@ -592,7 +577,7 @@
         if (chapterMode) {
           currentPage = chapters[currentChIdx].start;
           applyChapterMode();
-          readerPages.scrollTop = 0;
+          window.scrollTo(0, 0);
           updateIndicator();
           for (let i = currentPage; i <= Math.min(currentPage + 3, chapters[currentChIdx].end); i++) loadPage(i);
         } else {
