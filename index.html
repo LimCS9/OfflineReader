@@ -148,7 +148,6 @@
       -webkit-overflow-scrolling: touch;
       display: block; /* Removed flexbox to prevent squishing */
       background: #000;
-      padding-bottom: env(safe-area-inset-bottom, 20px); /* Safely clear the home bar */
       scrollbar-width: none;
       will-change: scroll-position;
     }
@@ -482,6 +481,35 @@
       }
     }
 
+    // --- Mode Toggle ---
+    modeToggle.addEventListener('click', () => {
+      chapterMode = !chapterMode;
+      modeToggle.textContent = chapterMode ? 'Chapter' : 'Scroll';
+      if (chapterMode) {
+        currentChIdx = chapters.findIndex(ch => currentPage >= ch.start && currentPage <= ch.end);
+        if (currentChIdx === -1) currentChIdx = 0;
+        applyChapterMode();
+        readerPages.scrollTop = 0;
+        for (let i = chapters[currentChIdx].start; i <= Math.min(chapters[currentChIdx].start + 3, chapters[currentChIdx].end); i++) loadPage(i);
+      } else {
+        applyScrollMode();
+        const el = document.querySelector(`.page-wrapper[data-index="${currentPage}"]`);
+        if (el) el.scrollIntoView();
+      }
+      updateIndicator();
+    });
+
+    function applyChapterMode() {
+      document.querySelectorAll('.page-wrapper').forEach(el => {
+        el.classList.toggle('ch-hidden', parseInt(el.dataset.chapter) !== currentChIdx);
+      });
+      document.querySelectorAll('.chapter-divider').forEach(el => el.classList.add('ch-hidden'));
+    }
+
+    function applyScrollMode() {
+      document.querySelectorAll('.ch-hidden').forEach(el => el.classList.remove('ch-hidden'));
+    }
+
     // --- Smooth Auto Scroll ---
     let lastTime = 0;
     function autoStep(timestamp) {
@@ -518,16 +546,34 @@
     });
 
     document.getElementById('close-btn').addEventListener('click', () => { location.reload(); });
+    
     document.getElementById('next-ch').addEventListener('click', () => {
       if (currentChIdx < chapters.length - 1) {
-        const next = chapters[currentChIdx + 1];
-        document.querySelector(`.page-wrapper[data-index="${next.start}"]`).scrollIntoView();
+        currentChIdx++;
+        if (chapterMode) {
+          currentPage = chapters[currentChIdx].start;
+          applyChapterMode();
+          readerPages.scrollTop = 0;
+          updateIndicator();
+          for (let i = currentPage; i <= Math.min(currentPage + 3, chapters[currentChIdx].end); i++) loadPage(i);
+        } else {
+          document.querySelector(`.page-wrapper[data-index="${chapters[currentChIdx].start}"]`).scrollIntoView();
+        }
       }
     });
+
     document.getElementById('prev-ch').addEventListener('click', () => {
       if (currentChIdx > 0) {
-        const prev = chapters[currentChIdx - 1];
-        document.querySelector(`.page-wrapper[data-index="${prev.start}"]`).scrollIntoView();
+        currentChIdx--;
+        if (chapterMode) {
+          currentPage = chapters[currentChIdx].start;
+          applyChapterMode();
+          readerPages.scrollTop = 0;
+          updateIndicator();
+          for (let i = currentPage; i <= Math.min(currentPage + 3, chapters[currentChIdx].end); i++) loadPage(i);
+        } else {
+          document.querySelector(`.page-wrapper[data-index="${chapters[currentChIdx].start}"]`).scrollIntoView();
+        }
       }
     });
   </script>
