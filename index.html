@@ -366,6 +366,37 @@
       document.getElementById(id).style.display = id === 'reader-screen' ? 'block' : 'flex';
     }
 
+    // Smart parsing for clean UI Titles
+    function getComicTitle(files) {
+      if (!files.length) return "Comic";
+      let name = files[0].name.replace(/\.(cbz|zip)$/i, '').replace(/_/g, ' ');
+      const parts = name.split(/\s+-\s+/);
+      if (parts.length > 1) return parts[0].trim();
+      return name.replace(/\s*(?:-?\s*(?:c|ch|vol|chapter|volume)\.?\s*\d+).*$/i, '').trim();
+    }
+
+    // Smart parsing for chapter numbers and clean divider text
+    function extractChapterInfo(filename) {
+      let name = basename(filename).replace(/\.(cbz|zip)$/i, '').replace(/_/g, ' ');
+      
+      let displayNum = null;
+      const numMatch = name.match(/(?:c|ch|chapter|vol|volume)\.?\s*0*(\d+(\.\d+)?)/i);
+      if (numMatch) {
+          displayNum = numMatch[1];
+      } else {
+          const fallbackMatch = name.match(/(?:-\s+|\[)0*(\d+(\.\d+)?)/);
+          if (fallbackMatch) displayNum = fallbackMatch[1];
+      }
+
+      const parts = name.split(/\s+-\s+/);
+      let cleanName = name;
+      if (parts.length > 1) {
+          cleanName = parts[parts.length - 1].trim();
+      }
+
+      return { displayNum, cleanName };
+    }
+
     // --- Archive Processing ---
     async function extractEntries(zip, fallbackName) {
       const allFiles = Object.values(zip.files).filter(f => !f.dir).sort((a, b) => naturalSort(a.name, b.name));
@@ -380,7 +411,7 @@
         try {
           const inner = await JSZip.loadAsync(await arch.async('arraybuffer'));
           const imgs = Object.values(inner.files).filter(f => !f.dir && IMAGE_EXT.test(f.name)).sort((a, b) => naturalSort(a.name, b.name));
-          if (imgs.length) result.push({ images: imgs, name: basename(arch.name).replace(ARCHIVE_EXT, '') });
+          if (imgs.length) result.push({ images: imgs, name: basename(arch.name) }); // Use full basename for parser
         } catch (e) {}
       }
       if (images.length) result.unshift({ images, name: 'Extras' });
@@ -396,13 +427,17 @@
       readerPages.innerHTML = '';
       window.scrollTo(0, 0); // Reset scroll to top
 
+      // Set optimized Title Name
+      comicTitle.textContent = getComicTitle(files);
+
       if (files.length === 1) {
         const zip = await JSZip.loadAsync(await files[0].arrayBuffer());
-        const groups = await extractEntries(zip, files[0].name.replace(ARCHIVE_EXT, ''));
+        const groups = await extractEntries(zip, files[0].name);
         groups.forEach(g => {
           const start = pages.length;
           g.images.forEach(entry => pages.push({ entry, url: null, loading: false, aspectLocked: false }));
-          chapters.push({ name: g.name, start, end: pages.length - 1 });
+          const { displayNum, cleanName } = extractChapterInfo(g.name);
+          chapters.push({ name: cleanName, displayNum, start, end: pages.length - 1 });
         });
       } else {
         files.sort((a,b) => naturalSort(a.name, b.name));
@@ -412,12 +447,12 @@
           if (imgs.length) {
             const start = pages.length;
             imgs.forEach(entry => pages.push({ entry, url: null, loading: false, aspectLocked: false }));
-            chapters.push({ name: f.name.replace(ARCHIVE_EXT,''), start, end: pages.length - 1 });
+            const { displayNum, cleanName } = extractChapterInfo(f.name);
+            chapters.push({ name: cleanName, displayNum, start, end: pages.length - 1 });
           }
         }
       }
 
-      comicTitle.textContent = chapters[0].name;
       renderPages();
       showScreen('reader-screen');
       uiHidden = false;
@@ -535,7 +570,9 @@
       }
 
       if (chapters.length > 1) {
-        document.getElementById('chapter-label').textContent = `${currentChIdx + 1}/${chapters.length}`;
+        const currentCh = chapters[currentChIdx];
+        const chLabel = currentCh.displayNum ? currentCh.displayNum : (currentChIdx + 1);
+        document.getElementById('chapter-label').textContent = `${chLabel}/${chapters.length}`;
       }
     }
 
