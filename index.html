@@ -337,7 +337,9 @@
     let autoRunning = false;
     let speedIdx = 3;
     let uiHidden = false;
-    let autoscrollEnabled = false; // State to track if autoscroll UI is toggled on explicitly
+    let autoscrollEnabled = false; 
+    let maxChapterNum = 0; // Tracks the highest chapter number for accurate math
+
     const SPEED_LEVELS = [0.3, 0.6, 1.0, 1.6, 2.5, 4.0, 6.0, 9.0];
     const MEMORY_WINDOW = 12;
     const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
@@ -370,9 +372,12 @@
     function getComicTitle(files) {
       if (!files.length) return "Comic";
       let name = files[0].name.replace(/\.(cbz|zip)$/i, '').replace(/_/g, ' ');
-      const parts = name.split(/\s+-\s+/);
-      if (parts.length > 1) return parts[0].trim();
-      return name.replace(/\s*(?:-?\s*(?:c|ch|vol|chapter|volume)\.?\s*\d+).*$/i, '').trim();
+      // Handle the parent ZIP wrapper name first if it has chapters
+      let mainTitle = name.replace(/\s*(?:-?\s*(?:c|ch|vol|chapter|volume)\.?\s*\d+).*$/i, '').trim();
+      
+      // If it still has a range like "ch.1-ch.9", strip that out
+      mainTitle = mainTitle.replace(/\s*-\s*ch\.\d+.*$/i, '').trim();
+      return mainTitle;
     }
 
     // Smart parsing for chapter numbers and clean divider text
@@ -380,18 +385,23 @@
       let name = basename(filename).replace(/\.(cbz|zip)$/i, '').replace(/_/g, ' ');
       
       let displayNum = null;
+      // Looks for c0009 or ch.9 or chapter 9
       const numMatch = name.match(/(?:c|ch|chapter|vol|volume)\.?\s*0*(\d+(\.\d+)?)/i);
       if (numMatch) {
-          displayNum = numMatch[1];
+          displayNum = parseFloat(numMatch[1]);
       } else {
+          // Fallback, looks for - 009 or [009]
           const fallbackMatch = name.match(/(?:-\s+|\[)0*(\d+(\.\d+)?)/);
-          if (fallbackMatch) displayNum = fallbackMatch[1];
+          if (fallbackMatch) displayNum = parseFloat(fallbackMatch[1]);
       }
 
+      // Look for the last chunk after a hyphen for clean naming like "Ch.9 Episode 9"
       const parts = name.split(/\s+-\s+/);
       let cleanName = name;
       if (parts.length > 1) {
           cleanName = parts[parts.length - 1].trim();
+      } else if (displayNum !== null) {
+          cleanName = `Chapter ${displayNum}`;
       }
 
       return { displayNum, cleanName };
@@ -425,9 +435,9 @@
       showScreen('loading-screen');
       pages = []; chapters = []; blobUrls.forEach(URL.revokeObjectURL); blobUrls = [];
       readerPages.innerHTML = '';
-      window.scrollTo(0, 0); // Reset scroll to top
+      window.scrollTo(0, 0); 
+      maxChapterNum = 0; 
 
-      // Set optimized Title Name
       comicTitle.textContent = getComicTitle(files);
 
       if (files.length === 1) {
@@ -451,6 +461,14 @@
             chapters.push({ name: cleanName, displayNum, start, end: pages.length - 1 });
           }
         }
+      }
+
+      // Find the highest chapter number to set as the denominator
+      const validNums = chapters.map(c => c.displayNum).filter(n => n !== null);
+      if (validNums.length > 0) {
+        maxChapterNum = Math.max(...validNums);
+      } else {
+        maxChapterNum = chapters.length;
       }
 
       renderPages();
@@ -500,8 +518,6 @@
         p.el.src = p.url;
         p.el.onload = () => {
           p.el.classList.remove('placeholder');
-          // Lock height using native aspect-ratio. 
-          // This allows flawless height recalcuations natively when the phone rotates.
           if (!p.aspectLocked) {
             const nw = p.el.naturalWidth;
             const nh = p.el.naturalHeight;
@@ -571,8 +587,11 @@
 
       if (chapters.length > 1) {
         const currentCh = chapters[currentChIdx];
-        const chLabel = currentCh.displayNum ? currentCh.displayNum : (currentChIdx + 1);
-        document.getElementById('chapter-label').textContent = `${chLabel}/${chapters.length}`;
+        // Display the actual extracted chapter number, falling back to physical index
+        const chLabel = currentCh.displayNum !== null ? currentCh.displayNum : (currentChIdx + 1);
+        // Ensure the denominator is at least the highest chapter number found
+        const totalLabel = Math.max(maxChapterNum, chapters.length);
+        document.getElementById('chapter-label').textContent = `${chLabel}/${totalLabel}`;
       }
     }
 
