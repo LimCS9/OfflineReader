@@ -20,12 +20,12 @@
       --muted:  #888;
     }
 
-    /* Lock the body to prevent iOS bounce and gray gaps */
+    /* Strict fullscreen to draw completely under notches and home indicators */
     html, body {
       position: fixed;
       inset: 0;
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100dvh;
       background-color: #000000 !important;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -144,9 +144,12 @@
     #reader-pages {
       position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
       overflow-y: scroll;
+      overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
-      display: block; /* Removed flexbox to prevent squishing */
+      display: block;
       background: #000;
       scrollbar-width: none;
       will-change: scroll-position;
@@ -156,17 +159,16 @@
     .page-wrapper {
       width: 100%;
       background: #000;
-      display: block; /* Ensures natural stacking */
+      display: block; 
       position: relative;
-      min-height: 200px; 
     }
-    .page-wrapper.ch-hidden { display: none; }
 
     .comic-page {
       display: block;
       width: 100%;
       height: auto;
-      object-fit: contain; /* Prevents aspect ratio distortion */
+      margin: 0;
+      padding: 0;
     }
     .comic-page.placeholder {
       aspect-ratio: 2/3;
@@ -182,6 +184,9 @@
       text-transform: uppercase;
       letter-spacing: 1px;
     }
+
+    /* Hides elements robustly without layout shifting bugs */
+    .ch-hidden { display: none !important; }
 
     /* ── Controls ── */
     .icon-btn {
@@ -420,7 +425,7 @@
         p.el.src = p.url;
         p.el.onload = () => {
           p.el.classList.remove('placeholder');
-          // LOCK HEIGHT using bounding rect for decimal accuracy to prevent jagged scrolling
+          // Lock height using bounding rect to prevent jagged scrolling
           if (!p.height) {
             p.height = p.el.getBoundingClientRect().height;
             p.wrap.style.height = p.height + 'px';
@@ -439,21 +444,30 @@
       });
     }
 
-    // --- Observers ---
+    // --- Reliable Intersection Observer ---
+    let visiblePages = new Set();
     function setupObservers() {
       const observer = new IntersectionObserver(entries => {
         entries.forEach(e => {
+          const idx = parseInt(e.target.dataset.index);
           if (e.isIntersecting) {
-            const idx = parseInt(e.target.dataset.index);
+            visiblePages.add(idx);
             for(let i = idx - 2; i <= idx + 4; i++) if(i >= 0 && i < pages.length) loadPage(i);
-            if (idx !== currentPage) {
-              currentPage = idx;
-              updateIndicator();
-              unloadDistant();
-            }
+          } else {
+            visiblePages.delete(idx);
           }
         });
-      }, { root: readerPages, threshold: 0.1 });
+
+        // Ensure current page is the topmost visible image on screen
+        if (visiblePages.size > 0) {
+          const minVisible = Math.min(...Array.from(visiblePages));
+          if (minVisible !== currentPage) {
+            currentPage = minVisible;
+            updateIndicator();
+            unloadDistant();
+          }
+        }
+      }, { root: readerPages, threshold: 0.05 }); // Triggers almost instantly
       document.querySelectorAll('.page-wrapper').forEach(w => observer.observe(w));
     }
 
@@ -466,18 +480,21 @@
     }
 
     function updateIndicator() {
+      // Accurately determine the active chapter based on the visible page
+      const chIdx = chapters.findIndex(ch => currentPage >= ch.start && currentPage <= ch.end);
+      if (chIdx !== -1) currentChIdx = chIdx;
+
+      // Update Top Right Indicator
       if (chapterMode) {
         const ch = chapters[currentChIdx];
         pageIndicator.textContent = `${currentPage - ch.start + 1} / ${ch.end - ch.start + 1}`;
       } else {
         pageIndicator.textContent = `${currentPage + 1} / ${pages.length}`;
       }
+
+      // Update Center Chapter Label
       if (chapters.length > 1) {
-        const chIdx = chapters.findIndex(ch => currentPage >= ch.start && currentPage <= ch.end);
-        if (chIdx !== -1 && chIdx !== currentChIdx) {
-          currentChIdx = chIdx;
-          document.getElementById('chapter-label').textContent = `${currentChIdx + 1}/${chapters.length}`;
-        }
+        document.getElementById('chapter-label').textContent = `${currentChIdx + 1}/${chapters.length}`;
       }
     }
 
@@ -503,6 +520,7 @@
       document.querySelectorAll('.page-wrapper').forEach(el => {
         el.classList.toggle('ch-hidden', parseInt(el.dataset.chapter) !== currentChIdx);
       });
+      // The CSS .ch-hidden class now has !important to ensure dividers are completely removed
       document.querySelectorAll('.chapter-divider').forEach(el => el.classList.add('ch-hidden'));
     }
 
@@ -547,6 +565,7 @@
 
     document.getElementById('close-btn').addEventListener('click', () => { location.reload(); });
     
+    // --- Navigation ---
     document.getElementById('next-ch').addEventListener('click', () => {
       if (currentChIdx < chapters.length - 1) {
         currentChIdx++;
