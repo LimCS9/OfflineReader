@@ -157,6 +157,8 @@
     #reader-pages {
       width: 100%;
       background: #000;
+      /* Adds a visual buffer at the top of the canvas to clear the notch entirely */
+      padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
     }
 
     .page-wrapper {
@@ -338,7 +340,7 @@
     let speedIdx = 3;
     let uiHidden = false;
     let autoscrollEnabled = false; 
-    let maxChapterNum = 0; // Tracks the highest chapter number for accurate math
+    let maxChapterNum = 0; 
 
     const SPEED_LEVELS = [0.3, 0.6, 1.0, 1.6, 2.5, 4.0, 6.0, 9.0];
     const MEMORY_WINDOW = 12;
@@ -395,13 +397,20 @@
           if (fallbackMatch) displayNum = parseFloat(fallbackMatch[1]);
       }
 
-      // Look for the last chunk after a hyphen for clean naming like "Ch.9 Episode 9"
+      // Extract the last logical text chunk
       const parts = name.split(/\s+-\s+/);
       let cleanName = name;
       if (parts.length > 1) {
           cleanName = parts[parts.length - 1].trim();
-      } else if (displayNum !== null) {
-          cleanName = `Chapter ${displayNum}`;
+      }
+
+      // Cleanup: Removes redundant "Ch.9 " if there is more descriptive text after it like "Episode 9"
+      cleanName = cleanName.replace(/^(?:c|ch|chapter|v|vol|volume)\.?\s*0*\d+(\.\d+)?\s+/i, '');
+
+      // Cleanup: If the remaining name is literally just a raw identifier like "c0009" or "009" or "Ch.9", format it cleanly
+      if (/^(?:c|ch|chapter|v|vol|volume)?\.?\s*0*\d+(\.\d+)?$/i.test(cleanName)) {
+          const extracted = cleanName.match(/\d+(\.\d+)?/)[0];
+          cleanName = `Chapter ${parseFloat(extracted)}`;
       }
 
       return { displayNum, cleanName };
