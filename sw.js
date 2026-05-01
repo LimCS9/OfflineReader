@@ -1,10 +1,8 @@
-const CACHE_NAME = 'cbz-reader-v4';
+const CACHE_NAME = 'cbz-reader-v5';
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './app.js',
   './manifest.json',
-  './icon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
 ];
 
@@ -28,15 +26,6 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
-  // Navigation requests → serve app shell
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('./index.html').then(cached => cached || fetch(event.request))
-    );
-    return;
-  }
-
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))
   );
