@@ -114,7 +114,7 @@
       background: #000;
     }
 
-    /* Fixed to the window so it stays at top even when body scrolls */
+    /* Fixed Top Header */
     #reader-header {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -129,7 +129,23 @@
       border-bottom: 1px solid rgba(255,255,255,0.08);
       transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    #reader-header.header-hidden { transform: translateY(-100%); }
+    #reader-header.ui-hidden { transform: translateY(-100%); }
+
+    /* Fixed Bottom Footer for Navigation */
+    #reader-footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      padding: .6rem .7rem calc(.6rem + env(safe-area-inset-bottom, 0px));
+      background: rgba(10,10,10,.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #reader-footer.ui-hidden { transform: translateY(100%); }
 
     #comic-title {
       flex: 1;
@@ -188,7 +204,16 @@
     }
     .icon-btn:active { background: rgba(255,255,255,0.1); }
 
-    #chapter-label { font-size: .75rem; color: var(--muted); padding: 0 .4rem; }
+    #chapter-nav {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    #chapter-label { font-size: .75rem; color: var(--muted); padding: 0 .2rem; }
+    
     #mode-toggle {
       font-size: .7rem; font-weight: 700;
       background: var(--surf); border: 1px solid var(--border);
@@ -199,31 +224,33 @@
     /* ── Auto-scroll ── */
     #autoscroll-bar {
       position: fixed;
-      bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+      bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 200;
       display: flex;
       align-items: center;
-      gap: .8rem;
-      background: rgba(15,15,15,0.96);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      border: 1px solid rgba(255,255,255,0.1);
+      gap: .6rem;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.05);
       border-radius: 100px;
-      padding: .6rem 1.1rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+      padding: .5rem 1rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
       transition: all 0.3s ease;
     }
     #autoscroll-bar.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
 
     .as-btn {
       background: none; border: none; color: #fff;
-      font-size: 1.3rem; width: 34px; height: 34px;
+      font-size: 1.2rem; width: 30px; height: 30px;
       display: flex; align-items: center; justify-content: center;
+      opacity: 0.9;
     }
-    #as-playpause { background: var(--accent); border-radius: 50%; font-size: .9rem; width: 38px; height: 38px; }
-    #as-speed-label { min-width: 3.2rem; text-align: center; font-size: .85rem; font-weight: 700; }
+    .as-btn:active { opacity: 0.5; }
+    #as-playpause { background: var(--accent); border-radius: 50%; font-size: .85rem; width: 34px; height: 34px; opacity: 1;}
+    #as-speed-label { min-width: 2.5rem; text-align: center; font-size: .85rem; font-weight: 700; opacity: 0.9;}
 
     .hidden { display: none !important; }
   </style>
@@ -256,25 +283,27 @@
       </button>
       <span id="comic-title">Comic</span>
       
-      <div id="chapter-nav" class="hidden" style="display:flex; align-items:center;">
-        <button class="icon-btn" id="prev-ch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-        <span id="chapter-label">1/1</span>
-        <button class="icon-btn" id="next-ch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-      </div>
-
       <button id="mode-toggle" class="hidden">Scroll</button>
       <button class="icon-btn" id="autoscroll-toggle">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
       </button>
-      <span id="page-indicator">0/0</span>
     </header>
 
     <div id="reader-pages"></div>
 
+    <footer id="reader-footer">
+      <span id="page-indicator">0/0</span>
+      <div id="chapter-nav" class="hidden">
+        <button class="icon-btn" id="prev-ch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <span id="chapter-label">1/1</span>
+        <button class="icon-btn" id="next-ch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </footer>
+
     <div id="autoscroll-bar" class="hidden">
       <button class="as-btn" id="as-slower">−</button>
       <button class="as-btn" id="as-playpause">▶</button>
-      <span id="as-speed-label">1.2×</span>
+      <span id="as-speed-label">0</span>
       <button class="as-btn" id="as-faster">+</button>
     </div>
   </div>
@@ -311,6 +340,7 @@
     const pageIndicator = document.getElementById('page-indicator');
     const autoscrollBar = document.getElementById('autoscroll-bar');
     const readerHeader = document.getElementById('reader-header');
+    const readerFooter = document.getElementById('reader-footer');
     const chapterNav = document.getElementById('chapter-nav');
     const modeToggle = document.getElementById('mode-toggle');
 
@@ -517,6 +547,17 @@
 
     // --- Smooth Auto Scroll via Window Scroll ---
     let lastTime = 0;
+    let idleTimer = null;
+
+    function resetIdle() {
+      clearTimeout(idleTimer);
+      if (!autoscrollBar.classList.contains('hidden')) {
+        idleTimer = setTimeout(() => {
+          autoscrollBar.classList.add('hidden');
+        }, 3000); // Auto-hides after 3 seconds of no interaction
+      }
+    }
+
     function autoStep(timestamp) {
       if (!autoRunning) return;
       if (!lastTime) lastTime = timestamp;
@@ -534,23 +575,57 @@
     function startAutoScroll() {
       autoRunning = true; lastTime = 0;
       document.getElementById('as-playpause').textContent = '⏸';
-      autoscrollBar.classList.add('hidden');
-      readerHeader.classList.add('header-hidden');
+      
+      // Hide standard UI elements when starting
+      uiHidden = true;
+      readerHeader.classList.add('ui-hidden');
+      readerFooter.classList.add('ui-hidden');
+      
+      resetIdle(); 
       requestAnimationFrame(autoStep);
     }
-    function stopAutoScroll() { autoRunning = false; document.getElementById('as-playpause').textContent = '▶'; }
+    function stopAutoScroll() { 
+      autoRunning = false; 
+      document.getElementById('as-playpause').textContent = '▶'; 
+      resetIdle(); 
+    }
 
-    document.getElementById('autoscroll-toggle').addEventListener('click', (e) => { e.stopPropagation(); autoscrollBar.classList.toggle('hidden'); });
+    autoscrollBar.addEventListener('touchstart', resetIdle, {passive: true});
+    autoscrollBar.addEventListener('click', resetIdle);
+
+    document.getElementById('autoscroll-toggle').addEventListener('click', (e) => { 
+      e.stopPropagation(); 
+      autoscrollBar.classList.toggle('hidden'); 
+      resetIdle();
+    });
     document.getElementById('as-playpause').addEventListener('click', () => autoRunning ? stopAutoScroll() : startAutoScroll());
-    document.getElementById('as-faster').addEventListener('click', () => { if(speedIdx < SPEED_LEVELS.length-1) speedIdx++; updateSpeedLabel(); });
-    document.getElementById('as-slower').addEventListener('click', () => { if(speedIdx > 0) speedIdx--; updateSpeedLabel(); });
-    function updateSpeedLabel() { document.getElementById('as-speed-label').textContent = SPEED_LEVELS[speedIdx].toFixed(1) + '×'; }
+    
+    document.getElementById('as-faster').addEventListener('click', () => { 
+      if(speedIdx < SPEED_LEVELS.length-1) speedIdx++; 
+      updateSpeedLabel(); 
+      resetIdle(); 
+    });
+    document.getElementById('as-slower').addEventListener('click', () => { 
+      if(speedIdx > 0) speedIdx--; 
+      updateSpeedLabel(); 
+      resetIdle(); 
+    });
+    
+    function updateSpeedLabel() { 
+      const diff = speedIdx - 3;
+      document.getElementById('as-speed-label').textContent = diff > 0 ? '+' + diff : diff.toString(); 
+    }
 
-    let headerHidden = false;
+    let uiHidden = false;
     readerPages.addEventListener('click', () => {
-      if (autoRunning) { stopAutoScroll(); autoscrollBar.classList.remove('hidden'); }
-      headerHidden = !headerHidden;
-      readerHeader.classList.toggle('header-hidden', headerHidden);
+      if (autoRunning) { 
+        stopAutoScroll(); 
+        autoscrollBar.classList.remove('hidden'); 
+        resetIdle();
+      }
+      uiHidden = !uiHidden;
+      readerHeader.classList.toggle('ui-hidden', uiHidden);
+      readerFooter.classList.toggle('ui-hidden', uiHidden);
     });
 
     document.getElementById('close-btn').addEventListener('click', () => { location.reload(); });
