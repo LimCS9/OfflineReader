@@ -1,6 +1,6 @@
 {
-  "name": "CBZ Comic Reader",
-  "short_name": "CBZ Reader",
+  "name": "Offline Reader",
+  "short_name": "Offline Reader",
   "description": "Read CBZ and ZIP comic archives offline",
   "start_url": "./",
   "display": "standalone",
