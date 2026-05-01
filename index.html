@@ -20,9 +20,13 @@
       --muted:  #888;
     }
 
+    /* Lock the body to prevent iOS bounce and gray gaps */
     html, body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
       height: 100%;
-      background: var(--bg);
+      background-color: #000000 !important;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       overscroll-behavior: none;
@@ -35,7 +39,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100dvh;
+      height: 100%;
       padding: 2rem 1.5rem;
       gap: 1.5rem;
       text-align: center;
@@ -91,7 +95,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100dvh;
+      height: 100%;
       gap: 1.2rem;
     }
     .spinner {
@@ -108,8 +112,8 @@
     #reader-screen {
       display: none;
       position: relative;
-      height: 100dvh;
-      width: 100vw;
+      height: 100%;
+      width: 100%;
       background: #000;
       overflow: hidden;
     }
@@ -136,16 +140,16 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
+    /* ── Scrolling Area ── */
     #reader-pages {
       position: absolute;
       inset: 0;
       overflow-y: scroll;
       -webkit-overflow-scrolling: touch;
-      display: flex;
-      flex-direction: column;
+      display: block; /* Removed flexbox to prevent squishing */
       background: #000;
+      padding-bottom: env(safe-area-inset-bottom, 20px); /* Safely clear the home bar */
       scrollbar-width: none;
-      /* GPU acceleration */
       will-change: scroll-position;
     }
     #reader-pages::-webkit-scrollbar { display: none; }
@@ -153,10 +157,8 @@
     .page-wrapper {
       width: 100%;
       background: #000;
-      display: flex;
-      justify-content: center;
+      display: block; /* Ensures natural stacking */
       position: relative;
-      /* Initial height to prevent collapses */
       min-height: 200px; 
     }
     .page-wrapper.ch-hidden { display: none; }
@@ -165,12 +167,11 @@
       display: block;
       width: 100%;
       height: auto;
-      transition: opacity 0.3s ease;
+      object-fit: contain; /* Prevents aspect ratio distortion */
     }
     .comic-page.placeholder {
       aspect-ratio: 2/3;
       background: #080808;
-      opacity: 0.2;
     }
 
     .chapter-divider {
@@ -420,9 +421,9 @@
         p.el.src = p.url;
         p.el.onload = () => {
           p.el.classList.remove('placeholder');
-          // LOCK HEIGHT to prevent jagged scrolling
+          // LOCK HEIGHT using bounding rect for decimal accuracy to prevent jagged scrolling
           if (!p.height) {
-            p.height = p.el.offsetHeight;
+            p.height = p.el.getBoundingClientRect().height;
             p.wrap.style.height = p.height + 'px';
           }
         };
